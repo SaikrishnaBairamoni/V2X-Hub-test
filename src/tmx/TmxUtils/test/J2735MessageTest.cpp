@@ -603,6 +603,20 @@ TEST_F(J2735MessageTest, EncodePersonalSafetyMessage){
 	std::cout << psmENC.get_payload_str()<<std::endl;
 	ASSERT_EQ(32,  psmENC.get_msgId());
 }
+
+// TEST_F(J2735MessageTest, EncodeRoadSideAlertMessage){
+// 	string rsa="<RoadSideAlert><basicType><aPEDESTRIAN/></basicType><secMark>109</secMark><msgCnt>0</msgCnt><id>115eadf0</id><position><lat>389549376</lat><long>-771491840</long></position><accuracy><semiMajor>255</semiMajor><semiMinor>255</semiMinor><orientation>65535</orientation></accuracy><speed>0</speed><heading>16010</heading><pathHistory><crumbData><PathHistoryPoint><latOffset>0</latOffset><lonOffset>0</lonOffset><elevationOffset>0</elevationOffset><timeOffset>1</timeOffset></PathHistoryPoint></crumbData></pathHistory></PersonalSafetyMessage>";
+// 	std::stringstream ss;
+// 	PsmMessage rsamessage;
+// 	PsmEncodedMessage rsaENC;
+// 	tmx::message_container_type container;
+// 	ss<<rsa;
+// 	container.load<XML>(ss);
+// 	rsamessage.set_contents(container.get_storage().get_tree());
+// 	rsaENC.encode_j2735_message(rsamessage);
+// 	std::cout << rsaENC.get_payload_str()<<std::endl;
+// 	ASSERT_EQ(32,  rsaENC.get_msgId());
+// }
 	
 TEST_F(J2735MessageTest, EncodeTrafficControlRequest){
 	string tsm4str="<TestMessage04><body><tcrV01><reqid>C7C9A13FE6AC464E</reqid><reqseq>0</reqseq><scale>0</scale><bounds><TrafficControlBounds><oldest>27493419</oldest><reflon>-818349472</reflon><reflat>281118677</reflat><offsets><OffsetPoint><deltax>376</deltax><deltay>0</deltay></OffsetPoint><OffsetPoint><deltax>376</deltax><deltay>1320</deltay></OffsetPoint><OffsetPoint><deltax>0</deltax><deltay>1320</deltay></OffsetPoint></offsets></TrafficControlBounds></bounds></tcrV01> </body></TestMessage04>";
