@@ -2,7 +2,7 @@
 // Name        : RsaPlugin.cpp
 // Author      : FHWA Saxton Transportation Operations Laboratory  
 // Version     :
-// Copyright   : Copyright (c) 2019 FHWA Saxton Transportation Operations Laboratory. All rights reserved.
+// Copyright   : Copyright (c) 2023 FHWA Saxton Transportation Operations Laboratory. All rights reserved.
 // Description : Rsa Plugin
 //==========================================================================
 
@@ -20,13 +20,22 @@ RsaPlugin::RsaPlugin(string name): PluginClient(name)
 	// The log level can be changed from the default here.
 	FILELog::ReportingLevel() = FILELog::FromString("DEBUG");
 
+	AddMessageFilter<RsaMessage>(this, &RsaPlugin::HandleRoadSideAlertMessage);
+
 	// Subscribe to all messages specified by the filters above.
 	SubscribeToMessages();
 }
 
 void RsaPlugin::RsaRequestHandler(QHttpEngine::Socket *socket)
 {
-	auto router = QSharedPointer<OpenAPI::OAIApiRouter>::create();
+	if(socket->bytesAvailable() == 0)
+	{
+		PLOG(logERROR) << "RSA Plugin does not receive web service request content!" << endl;
+		writeResponse(QHttpEngine::Socket::BadRequest, socket);
+		return;
+	}
+
+	// should read from the websocket and parse 
 	QString st; 
 	while(socket->bytesAvailable()>0)
 	{	
@@ -36,12 +45,17 @@ void RsaPlugin::RsaRequestHandler(QHttpEngine::Socket *socket)
 
 	char* rsaMsgdef = array.data();	
 	// Catch parse exceptions
+
+	stringstream ss;
+	ss << rsaMsgdef;
+	PLOG(logDEBUG) << "Received from webservice: " << ss.str() << endl;
+	
     try {
 	    BroadcastRsa(rsaMsgdef);
 		writeResponse(QHttpEngine::Socket::Created, socket);
 	}
-	catch(const J2735Exception &e) {
-        PLOG(logERROR) << "Error parsing file: " << e.what() << std::endl;
+	catch (TmxException &ex) {
+		PLOG(logERROR) << "Failed to encode message : " << ex.what();
 		writeResponse(QHttpEngine::Socket::BadRequest, socket);
 	}
 }
@@ -61,17 +75,25 @@ int RsaPlugin::StartWebService()
 	QSharedPointer<OpenAPI::OAIApiRequestHandler> handler(new OpenAPI::OAIApiRequestHandler());
 	handler = QSharedPointer<OpenAPI::OAIApiRequestHandler> (new OpenAPI::OAIApiRequestHandler());
 
+	auto router = QSharedPointer<OpenAPI::OAIApiRouter>::create();
+    router->setUpRoutes();
+
     QObject::connect(handler.data(), &OpenAPI::OAIApiRequestHandler::requestReceived, [&](QHttpEngine::Socket *socket) {
 
 		this->RsaRequestHandler(socket);
     });
 
+	QObject::connect(handler.data(), &OpenAPI::OAIApiRequestHandler::requestReceived, [&](QHttpEngine::Socket *socket) {
+		router->processRequest(socket);
+    });
+
     QHttpEngine::Server server(handler.data());
 
     if (!server.listen(address, port)) {
-        qCritical("Unable to listen on the specified port.");
+        qCritical("RsaPlugin:: Unable to listen on the specified port.");
         return 1;
     }
+	PLOG(logINFO)<<"RsaPlugin:: Started web service";
 	return a.exec();
 
 }
@@ -86,17 +108,12 @@ void RsaPlugin::UpdateConfigSettings()
 {
 	// Configuration settings are retrieved from the API using the GetConfigValue template class.
 	// This method does NOT execute in the main thread, so variables must be protected
-	// (e.g. using std::atomic, std::mutex, etc.).
+	// (e.g. using atomic, mutex, etc.).
 
-	int instance;
-	std::lock_guard<mutex> lock(_cfgLock);
+	lock_guard<mutex> lock(_cfgLock);
 
-	GetConfigValue<string>("WebServiceIP",webip);
-	GetConfigValue<uint16_t>("WebServicePort",webport);
-	GetConfigValue<int>("Instance", instance);
-
-	std::thread webthread(&RsaPlugin::StartWebService,this);
-	webthread.detach(); // wait for the thread to finish 
+	GetConfigValue<string>("WebServiceIP", webip);
+	GetConfigValue<uint16_t>("WebServicePort", webport);
 }
 
 void RsaPlugin::OnConfigChanged(const char *key, const char *value)
@@ -112,9 +129,17 @@ void RsaPlugin::OnStateChange(IvpPluginState state)
 	if (state == IvpPluginState_registered)
 	{
 		UpdateConfigSettings();
+		// Start webservice needs to occur after the first updateConfigSettings call to acquire port and ip configurations.
+		// Also needs to be called from Main thread to work.
+		thread webthread(&RsaPlugin::StartWebService, this);
+		webthread.detach(); // wait for the thread to finish 
 	}
 }
 
+void RsaPlugin::HandleRoadSideAlertMessage(RsaMessage &msg, routeable_message &routeableMsg)
+{
+	PLOG(logDEBUG)<<"HandleRoadSideAlertMessage";
+}
 
 void RsaPlugin::BroadcastRsa(char * rsaJson) 
 {  //overloaded 
@@ -122,17 +147,17 @@ void RsaPlugin::BroadcastRsa(char * rsaJson)
 	RsaMessage rsamessage;
 	RsaEncodedMessage rsaENC;
 	tmx::message_container_type container;
-	std::unique_ptr<RsaEncodedMessage> msg;
+	unique_ptr<RsaEncodedMessage> msg;
 
 	try
 	{
-		std::stringstream ss;
+		stringstream ss;
 		ss << rsaJson;
 
 		container.load<XML>(ss);
 		rsamessage.set_contents(container.get_storage().get_tree());
 
-		const std::string rsaString(rsaJson);
+		const string rsaString(rsaJson);
 
 		rsaENC.encode_j2735_message(rsamessage);
 
@@ -152,9 +177,9 @@ void RsaPlugin::BroadcastRsa(char * rsaJson)
 
 		PLOG(logINFO) << " RSA Plugin :: Broadcast RSA:: " << rsaENC.get_payload_str();	
 	}
-	catch(const std::exception& e)
+	catch(const exception& e)
 	{
-		PLOG(logWARNING) << "Error: " << e.what() << " broadcasting RSA for xml: " << rsaJson << std::endl;
+		PLOG(logWARNING) << "Error: " << e.what() << " broadcasting RSA for xml: " << rsaJson << endl;
 	}
 	
 	
@@ -176,7 +201,7 @@ void RsaPlugin::writeResponse(int responseCode , QHttpEngine::Socket *socket) {
 
 int RsaPlugin::Main()
 {
-	PLOG(logINFO) << "Starting plugin.";
+	PLOG(logINFO) << "RsaPlugin:: Starting plugin.\n";
 
 	uint msCount = 0;
 	while (_plugin->state != IvpPluginState_error)

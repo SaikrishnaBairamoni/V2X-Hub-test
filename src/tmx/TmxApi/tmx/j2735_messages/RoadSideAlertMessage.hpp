@@ -18,4 +18,18 @@ TMX_J2735_DECLARE(Rsa, RoadSideAlert, api::roadSideAlert_D, api::MSGSUBTYPE_ROAD
 TMX_J2735_DECLARE(Rsa, RoadSideAlert, api::roadSideAlert, api::MSGSUBTYPE_ROADSIDEALERT_STRING)
 #endif
 
+// Specialize the unique key function
+TMX_J2735_NAMESPACE_START(tmx)
+TMX_J2735_NAMESPACE_START(messages)
+TMX_J2735_NAMESPACE_START(j2735)
+
+template <>
+inline int get_j2735_message_key<tmx::messages::RsaMessage>(std::shared_ptr<RoadSideAlert> message) {
+	return 1;
+}
+
+TMX_J2735_NAMESPACE_END(j2735)
+TMX_J2735_NAMESPACE_END(messages)
+TMX_J2735_NAMESPACE_END(tmx)
+
 #endif /* TMX_J2735_MESSAGES_ROADSIDEALERTMESSAGE_HPP_ */

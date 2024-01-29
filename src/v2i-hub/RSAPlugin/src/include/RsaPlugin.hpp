@@ -2,7 +2,7 @@
 // Name        : RsaPlugin.cpp
 // Author      : FHWA Saxton Transportation Operations Laboratory  
 // Version     :
-// Copyright   : Copyright (c) 2019 FHWA Saxton Transportation Operations Laboratory. All rights reserved.
+// Copyright   : Copyright (c) 2023 FHWA Saxton Transportation Operations Laboratory. All rights reserved.
 // Description : RSA Plugin
 //==========================================================================
 #pragma once
@@ -57,12 +57,8 @@ class RsaPlugin: public PluginClient
 {
 public:
 	RsaPlugin(std::string);
-	RsaPlugin();
 	virtual ~RsaPlugin();
 	int Main();
-
-	uint16_t webport;
-	std::string webip;
 
 protected:
 	void UpdateConfigSettings();
@@ -71,9 +67,10 @@ protected:
 	void OnConfigChanged(const char *key, const char *value);
 	void OnStateChange(IvpPluginState state);
 
+	void HandleRoadSideAlertMessage(RsaMessage &msg, routeable_message &routeableMsg);
 	void BroadcastRsa(char *rsaJson);
-	int  StartWebService();	
-
+	
+	int  StartWebService();
 	void RsaRequestHandler(QHttpEngine::Socket *socket);
 	void writeResponse(int responseCode , QHttpEngine::Socket *socket);
 
@@ -81,8 +78,10 @@ private:
 	tmx::utils::UdpClient *_signSimClient = NULL;
 	J2735MessageFactory factory;
 	
+	uint16_t webport;
+	string webip;
 
 };
-std::mutex _cfgLock;
+mutex _cfgLock;
 
-};
+}
