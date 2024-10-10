@@ -51,12 +51,15 @@ public:
 	int Main();
 	void OnMessageReceived(tmx::routeable_message &msg);
 	void getmessageid();
+
 protected:
 	void UpdateConfigSettings();
 
 	// Virtual method overrides.
 	void OnConfigChanged(const char *key, const char *value);
 	void OnStateChange(IvpPluginState state);
+	void decodeMessage(tmx::messages::BsmEncodedMessage decodedMessage, std::vector<uint8_t> byteArray);
+
 private:
 	tmx::messages::BsmMessage* DecodeBsm(uint32_t vehicleId, uint32_t heading, uint32_t speed, uint32_t latitude,
 			   uint32_t longitude, uint32_t elevation, tmx::messages::DecodedBsmMessage &decodedBsm);
@@ -70,6 +73,7 @@ private:
 	std::atomic<bool> simBSM { true };
 	std::atomic<bool> simSRM { true };
 	std::atomic<bool> simLoc { true };
+	std::atomic<bool> decodeState { false };
 	unsigned int verState;
 	std::string url; 
 	std::string baseurl;
@@ -81,9 +85,17 @@ private:
 	uint _skippedSignVerifyErrorResponse;
 	const char* Key_SkippedSignVerifyError = "Message Skipped (Signature Verification Error Response)";
 
-
-	
-
+	tmx::messages::DecodedBsmMessage decodedBsm;
+	tmx::messages::BsmEncodedMessage encodedBsm;
+	tmx::messages::SrmEncodedMessage encodedSrm;
+	tmx::messages::BsmEncodedMessage decodedBsm_2;
+	tmx::messages::MapDataEncodedMessage decodedMap;
+	tmx::messages::PsmEncodedMessage decodedPsm;
+	tmx::messages::SrmEncodedMessage decodedSrm;
+	tmx::messages::SsmEncodedMessage decodedSsm;
+	tmx::messages::SpatEncodedMessage decodedSpat;
+	tmx::messages::TimEncodedMessage decodedTim;
+	tmx::messages::SdsmEncodedMessage decodedSdsm;
 };
 
 } /* namespace MessageReceiver */

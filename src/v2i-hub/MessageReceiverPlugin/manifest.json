@@ -34,6 +34,11 @@
 			"description":"Set the flag to route/broadcast a received J2735 message to TMX Core."
 		},
 		{
+			"key":"EnableDecode",
+			"default":"false",
+			"description":"If enabled, received messages will be decoded and printed to the logs."
+		},
+		{
 			"key":"EnableSimulatedBSM",
 			"default":"true",
 			"description":"Accept and route incoming BSM messages from a V2X Hub simulator." 

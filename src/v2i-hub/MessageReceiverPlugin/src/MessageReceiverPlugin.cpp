@@ -45,7 +45,7 @@ void MessageReceiverPlugin::getmessageid()
 	{
 		string tmp;
 		getline(ss, tmp, ',' );
-		messageid.push_back(tmp); 
+		messageid.push_back(tmp);
 	}
 
 }
@@ -63,6 +63,15 @@ TmxJ2735EncodedMessage<T> *encode(TmxJ2735EncodedMessage<T> &encMsg, T *msg) {
 	// Clean up the TMX message pointer and thus the J2735 structure pointer
 	delete msg;
 	return &encMsg;
+}
+
+void MessageReceiverPlugin::decodeMessage(tmx::messages::BsmEncodedMessage decodedMessage, std::vector<uint8_t> byteArray)
+{
+	decodedMessage.set_data(byteArray);
+    auto decodedPtr = decodedMessage.decode_j2735_message();
+
+    // Print out the decoded message
+    PLOG(logINFO) << "Decoded message: " << decodedPtr;
 }
 
 BsmMessage* MessageReceiverPlugin::DecodeBsm(uint32_t vehicleId, uint32_t heading, uint32_t speed, uint32_t latitude,
@@ -121,7 +130,8 @@ SrmMessage* MessageReceiverPlugin::DecodeSrm(uint32_t vehicleId, uint32_t headin
 	// send SRM
 	size_t s = sizeof(vehicleId);
 	SignalRequestMessage *srm = (SignalRequestMessage *)calloc(1, sizeof(SignalRequestMessage));
-	if (srm) {
+	if (srm) 
+	{
 		srm->requestor.id.present = VehicleID_PR_entityID;
 		srm->requestor.id.choice.entityID.size = s;
 		srm->requestor.id.choice.entityID.buf = (uint8_t *)calloc(s, sizeof(uint8_t));
@@ -169,10 +179,6 @@ SrmMessage* MessageReceiverPlugin::DecodeSrm(uint32_t vehicleId, uint32_t headin
 void MessageReceiverPlugin::OnMessageReceived(routeable_message &msg)
 {
 	routeable_message *sendMsg = &msg;
-
-	DecodedBsmMessage decodedBsm;
-	BsmEncodedMessage encodedBsm;
-	SrmEncodedMessage encodedSrm;
 
 	int msgPSID = api::msgPSID::None_PSID;
 
@@ -231,7 +237,7 @@ void MessageReceiverPlugin::OnMessageReceived(routeable_message &msg)
 					dataLength = ntohs(*((uint16_t*)&(bytes.data()[6])));
 
 
-					PLOG(logDEBUG1) << " Got message,  msgType: " << msgType
+					PLOG(logDEBUG) << " Got message,  msgType: " << msgType
 							<< ", msgVersion: " << msgVersion
 							<< ", id: " << id
 							<< ", dataLength: " << dataLength;
@@ -348,6 +354,13 @@ void MessageReceiverPlugin::OnMessageReceived(routeable_message &msg)
 		}
 		this->OutgoingMessage(*sendMsg);
 	}
+
+	// Decode any message
+	if (decodeState == true)
+	{
+		std::vector<uint8_t> byteArray = msg.get_payload_bytes();
+		decodeMessage(decodedBsm_2, byteArray);
+	}
 }
 
 void MessageReceiverPlugin::UpdateConfigSettings()
@@ -356,6 +369,7 @@ void MessageReceiverPlugin::UpdateConfigSettings()
 
 	// Atomic flags
 	GetConfigValue("RouteJ2735", routeDsrc);
+	GetConfigValue("EnableDecode", decodeState);
 	GetConfigValue("EnableSimulatedBSM", simBSM);
 	GetConfigValue("EnableSimulatedSRM", simSRM);
 	GetConfigValue("EnableSimulatedLocation", simLoc);
@@ -426,27 +440,28 @@ int MessageReceiverPlugin::Main()
 				uint64_t time = Clock::GetMillisecondsSinceEpoch();
 
 				totalBytes += len;
-				int txlen=0; 
-				
+				int txlen=0;
+
 				// @SONAR_STOP@
 				// if verification enabled, access HSM
 
 				if (verState == 1)
-				{  
+				{
 
-					//  convert unit8_t vector to hex stream 
+					//  convert unit8_t vector to hex stream
 
     				stringstream ss;
     				ss << std::hex << std::setfill('0');
-					uint16_t it=0; 
+					uint16_t it=0;
 
-    				for (uint16_t it=0; it <len; it++) {
+    				for (uint16_t it=0; it <len; it++) 
+					{
         				ss << std::setw(2) << static_cast<unsigned>(incoming[it]);
     				}
 
-					string msg = ss.str(); 
+					string msg = ss.str();
 
-					//the incoming payload is hex encoded, convert this to base64 
+					//the incoming payload is hex encoded, convert this to base64
 					std::string base64msg="";
 
 					hex2base64(msg,base64msg);
@@ -455,23 +470,23 @@ int MessageReceiverPlugin::Main()
 
 					std::string req = "\'{\"message\":\""+base64msg+"\"}\'";
 
-					string cmd1="curl -X POST "+url+" -H \'Content-Type: application/json\' -d "+req; 
+					string cmd1="curl -X POST "+url+" -H \'Content-Type: application/json\' -d "+req;
 
-					const char *cmd=cmd1.c_str();  
+					const char *cmd=cmd1.c_str();
 					char buffer[2048];
 					std::string result="";
-					FILE* pipemsg= popen(cmd,"r"); 
+					FILE* pipemsg= popen(cmd,"r");
 
 					if (pipemsg == NULL ) throw std::runtime_error("popen() failed!");
-					
+
 					try{
 						while (fgets(buffer, sizeof(buffer),pipemsg) != NULL)
 						{
-							result+=buffer; 
+							result+=buffer;
 						}
 					} catch (std::exception const & ex) {
-					
-						pclose(pipemsg); 
+
+						pclose(pipemsg);
 						SetStatus<uint>(Key_SkippedSignVerifyError, ++_skippedSignVerifyErrorResponse);
 						PLOG(logERROR) << "Error parsing Messages: " << ex.what();
 						continue;
@@ -493,65 +508,65 @@ int MessageReceiverPlugin::Main()
 
 					int msgValid = sd->valueint;
 
-					string extractedmsg=""; 
+					string extractedmsg="";
 					bool foundId=false;
 
 					if (msgValid == 1)
 					{
-						// look for a valid message type. 0012,0013,0014 etc. and count length of bytes to extract the message 
+						// look for a valid message type. 0012,0013,0014 etc. and count length of bytes to extract the message
 
-						std::vector<string>::iterator itr=messageid.begin(); 
-						int mlen; 
-						
+						std::vector<string>::iterator itr=messageid.begin();
+						int mlen;
+
 						while(itr != messageid.end())
 						{
-							//look for the message header within the first 20 bytes. 
+							//look for the message header within the first 20 bytes.
 							size_t idloc = msg.find(*itr);
 
 							if(idloc != string::npos and idloc < IDCHECKLIMIT) // making sure the msgID lies within the first IDCHECKLIMIT Characters 
 							{
-								// message id found 
-								if (msg[idloc+4] == '8') // if the length is longer than 256 
+								// message id found
+								if (msg[idloc+4] == '8') // if the length is longer than 256
 								{
-									string tmp = msg.substr(idloc+5,3); 
-									const char *c = tmp.c_str(); // take out next three nibble for length 
+									string tmp = msg.substr(idloc+5,3);
+									const char *c = tmp.c_str(); // take out next three nibble for length
 									mlen = (strtol(c,nullptr,16)+4)*2; // 5 nibbles added for msgid and the extra 1 byte
-									extractedmsg = msg.substr(idloc,mlen); 
+									extractedmsg = msg.substr(idloc,mlen);
 
 								}
-								else 
+								else
 								{
 									string tmp = msg.substr(idloc+4,2);
-									const char *c = tmp.c_str(); // take out next three nibble for length 
+									const char *c = tmp.c_str(); // take out next three nibble for length
 									mlen = (strtol(c,nullptr,16)+3)*2; // 5 nibbles added for msgid and the extra 1 byte
 									extractedmsg = msg.substr(idloc,mlen);
 								}
 
-								foundId=true; 
+								foundId=true;
 
-								int k=0; 
+								int k=0;
 
-								for (unsigned int i = 0; i < extractedmsg.length(); i += 2) {
+								for (unsigned int i = 0; i < extractedmsg.length(); i += 2) 
+								{
 									string bs = extractedmsg.substr(i, 2);
 									uint8_t byte = (uint8_t) strtol(bs.c_str(), nullptr, 16);
-									extractedpayload[k++]=byte; 
+									extractedpayload[k++]=byte;
 									txlen++;
-									
 								}
 								break; // can break out if already found a msg id 
 							} 
-							itr++; 
+							itr++;
 						}
 
 						if (foundId==false)
 						{
-							PLOG(logDEBUG) <<" Unable to find any valid msg ID in the incoming message. \n"; 
+							PLOG(logDEBUG) <<" Unable to find any valid msg ID in the incoming message. \n";
 							continue;  //do not send the message out to v2x hub if msgid check fails 
 						}
 					}
 					else
 					{
-						PLOG(logDEBUG) <<" Unable to verify the incoming message: Message Verification Error and dropped \n"; 
+						PLOG(logDEBUG) <<" Unable to verify the incoming message: Message Verification Error and dropped \n";
 
 						continue; // do not send the message out to v2x hub core if validation fails 
 					}
@@ -585,7 +600,7 @@ int MessageReceiverPlugin::Main()
 				}
 
 				this->IncomingMessage(extractedpayload.data(), txlen, enc.empty() ? nullptr : enc.c_str(), 0, 0, time);
-				
+
 			}
 			else if (len < 0)
 			{
@@ -607,7 +622,8 @@ int MessageReceiverPlugin::Main()
 
 			SetStatus("Total KBytes Received", b / 1024.0);
 
-			for (auto iter = totalCount.begin(); iter != totalCount.end(); iter++) {
+			for (auto iter = totalCount.begin(); iter != totalCount.end(); iter++) 
+			{
 				string param("Avg ");
 				param += iter->first;
 				param += " Message Interval (ms)";
