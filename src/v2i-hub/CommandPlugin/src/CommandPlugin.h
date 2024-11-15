@@ -43,6 +43,8 @@ using namespace std;
 using namespace tmxctl;
 using namespace boost::property_tree;
 using namespace boost::filesystem;
+using tmx::utils::telemetry::TelemetrySerializer;
+using tmx::utils::telemetry::TelemetryHeader;
 
 namespace CommandPlugin
 {
@@ -173,7 +175,7 @@ private:
 	static bool _haveMessages;
 	static bool _haveSystemConfig;
 	static bool _haveEvents;
-	static string _listJSON;
+	static tmx::message_container_type _listJSON;
 	static string _configJSON;
 	static string _statusJSON;
 	static string _stateJSON;
@@ -187,7 +189,7 @@ private:
 	static std::map<string, string> _statePluginsJSON;
 	static std::map<string, string> _messagesPluginsJSON;
 	static std::map<string, string> _systemConfigPluginsJSON;
-	static std::map<string, string> _listPluginsUpdatesJSON;
+	static std::map<string, tmx::message_container_type> _listPluginsUpdatesJSON;
 	static std::map<string, string> _configPluginsUpdatesJSON;
 	static std::map<string, string> _statusPluginsUpdatesJSON;
 	static std::map<string, string> _statePluginsUpdatesJSON;

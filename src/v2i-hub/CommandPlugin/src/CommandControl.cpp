@@ -19,6 +19,7 @@ void CommandPlugin::GetTelemetry(const string & dataType)
 	map<string, string> *pluginsJSON;
 	map<string, string> *pluginsUpdatesJSON;
 	map<string, string> *pluginsRemoveJSON;
+	map<string, tmx::message_container_type> *pluginsUpdatesContainer;
 	string pJSON;
 	plugins.push_back("%");
 	if (dataType == "List")
@@ -27,12 +28,12 @@ void CommandPlugin::GetTelemetry(const string & dataType)
 		if (_haveList)
 		{
 			//save full json output
-			_listJSON = _tmxControl.GetOutput(TmxControlOutputFormat_JSON, false);
+			_listJSON= *_tmxControl.GetOutput();
 			//set flag to process
 			processTelemetry = true;
 			//set pointers
 			pluginsJSON = &_listPluginsJSON;
-			pluginsUpdatesJSON = &_listPluginsUpdatesJSON;
+			pluginsUpdatesContainer = &_listPluginsUpdatesJSON;
 			pluginsRemoveJSON = &_listPluginsRemoveJSON;
 		}
 	}
@@ -129,114 +130,64 @@ void CommandPlugin::GetTelemetry(const string & dataType)
 	if (processTelemetry)
 	{
 		//clear updates
-		pluginsUpdatesJSON->clear();
+		if(pluginsUpdatesContainer && dataType =="List"){
+			pluginsUpdatesContainer->clear();
+		}else{
+			pluginsUpdatesJSON->clear();
+		}		
 		//for each plugin
 		tmx::message_container_type *output = _tmxControl.GetOutput();
-		BOOST_FOREACH(ptree::value_type &plugin, output->get_storage().get_tree())
-		{
-			stringstream ss;
-			ss.clear();
-			ss.str(string());
-			//get plugin name
-			string pluginName = plugin.first;
-			//put name in list for later use
-			pluginNames.insert(pluginName);
-			//get plugin json
-			message_tree_type tmpTree;
-			if (!plugin.second.empty())
-				tmpTree.put_child(plugin.first, plugin.second);
-			else
-				tmpTree.put(plugin.first, plugin.second.data());
-
-			boost::property_tree::write_json(ss, tmpTree, false);
-			pJSON = ss.str();
-			boost::algorithm::trim(pJSON);
-			//compare json, if not found or different add to updates
-			bool found = false;
-			if (pluginsJSON->find(pluginName) != pluginsJSON->end())
-				found = true;
-			if (!found || (*pluginsJSON)[pluginName] != pJSON)
+		auto payloadExist = output->get_storage().get_tree().get_child_optional("payload");
+		if(payloadExist){
+			const auto& payload = payloadExist.get();
+			for(const ptree::value_type &payloadItem: payload)
 			{
-				//read old json into ptree
-				ptree oldPlugin;
-				if (found)
+				auto plugin = payloadItem.second;
+				stringstream ss;
+				ss.clear();
+				ss.str(string());
+				//get plugin name
+				string pluginName = plugin.get<string>("name","");
+				//put name in list for later use
+				pluginNames.insert(pluginName);
+				//get plugin json
+				message_tree_type tmpTree;
+				if (!plugin.empty())
+					tmpTree.put_child(pluginName, plugin);
+				else
+					tmpTree.put(pluginName, plugin.data());
+				boost::property_tree::write_json(ss, tmpTree, false);
+				pJSON = ss.str();
+				boost::algorithm::trim(pJSON);
+				//compare json, if not found or different add to updates
+				bool found = false;
+				if (pluginsJSON->find(pluginName) != pluginsJSON->end())
+					found = true;
+				if (!found || (*pluginsJSON)[pluginName] != pJSON)
 				{
-					istringstream is((*pluginsJSON)[pluginName]);
-					read_json(is, oldPlugin);
-				}
-				//build plugin update json
-				bool first = true;
-				(*pluginsUpdatesJSON)[pluginName] = "\"";
-				(*pluginsUpdatesJSON)[pluginName].append(plugin.first);
-				if (dataType == "List" || dataType == "State")
-				{
-					(*pluginsUpdatesJSON)[pluginName].append("\": {");
-					//loop through all name/value pairs of new data and check against old data if updated
-					BOOST_FOREACH(ptree::value_type &nvp, plugin.second)
+					//read old json into ptree
+					ptree oldPlugin;
+					if (found)
 					{
-						bool update = false;
-						try
-						{
-							//get old value
-							message_path_type pluginKeyPath(pluginName, ATTRIBUTE_PATH_CHARACTER);
-							message_path_type keyPath(nvp.first, ATTRIBUTE_PATH_CHARACTER);
-							string value = oldPlugin.get_child(pluginKeyPath).get<string>(keyPath);
-							if (nvp.second.data() != value)
-							{
-								//values dont match
-								update = true;
-							}
-						}
-						catch (exception & ex)
-						{
-							//old node doesnt exist
-							update = true;
-						}
-						if (update)
-						{
-							//add this name/value pair to update json
-							if (first)
-								first = false;
-							else
-								(*pluginsUpdatesJSON)[pluginName].append(",");
-							(*pluginsUpdatesJSON)[pluginName].append("\"");
-							(*pluginsUpdatesJSON)[pluginName].append(nvp.first);
-							(*pluginsUpdatesJSON)[pluginName].append("\": \"");
-							string val = nvp.second.data();
-							boost::replace_all(val, "\"", "\\\"");
-							(*pluginsUpdatesJSON)[pluginName].append(val);
-							(*pluginsUpdatesJSON)[pluginName].append("\"");
-						}
+						istringstream is((*pluginsJSON)[pluginName]);
+						read_json(is, oldPlugin);
 					}
-					//close plugin brackets
-					(*pluginsUpdatesJSON)[pluginName].append("}");
-				}
-				else if (dataType == "Status")
-				{
-					//no need to parse since only one value to send
-					(*pluginsUpdatesJSON)[pluginName].append("\": \"");
-					(*pluginsUpdatesJSON)[pluginName].append(plugin.second.data());
-					(*pluginsUpdatesJSON)[pluginName].append("\"");
-				}
-				else if (dataType == "Config")
-				{
-					(*pluginsUpdatesJSON)[pluginName].append("\": {");
-					//loop through all config variables of new data
-					BOOST_FOREACH(ptree::value_type &cfg, plugin.second)
+					//build plugin update json
+					bool first = true;
+					map<string, string> tmpPluginUpdates;
+					tmpPluginUpdates["name"]=pluginName;
+					if (dataType == "List" || dataType == "State")
 					{
-						bool firstNvp = true;
-						bool addedConfigVariable = false;
-						//loop through all config variable name/value pairs of new data and check against old data if updated
-						BOOST_FOREACH(ptree::value_type &nvp, cfg.second)
+						//loop through all name/value pairs of new data and check against old data if updated
+						BOOST_FOREACH(ptree::value_type &nvp, plugin)
 						{
 							bool update = false;
 							try
 							{
 								//get old value
 								message_path_type pluginKeyPath(pluginName, ATTRIBUTE_PATH_CHARACTER);
-								message_path_type configKeyPath(cfg.first, ATTRIBUTE_PATH_CHARACTER);
 								message_path_type keyPath(nvp.first, ATTRIBUTE_PATH_CHARACTER);
-								string value = oldPlugin.get_child(pluginKeyPath).get_child(configKeyPath).get<string>(keyPath);
+								string value = oldPlugin.get_child(pluginKeyPath).get<string>(keyPath);
 								if (nvp.second.data() != value)
 								{
 									//values dont match
@@ -248,110 +199,158 @@ void CommandPlugin::GetTelemetry(const string & dataType)
 								//old node doesnt exist
 								update = true;
 							}
-
 							if (update)
 							{
-								if (!addedConfigVariable)
+								//add this name/value pair to update json
+								tmpPluginUpdates[nvp.first]=nvp.second.data();
+							}
+						}
+						//close plugin brackets
+						auto pluginUpdatesJson = TelemetrySerializer::serializeUpdatedTelemetry(tmpPluginUpdates);
+						(*pluginsUpdatesContainer)[pluginName] =  pluginUpdatesJson;
+					}
+					else if (dataType == "Status")
+					{
+						//no need to parse since only one value to send
+						(*pluginsUpdatesJSON)[pluginName].append("\": \"");
+						(*pluginsUpdatesJSON)[pluginName].append(plugin.data());
+						(*pluginsUpdatesJSON)[pluginName].append("\"");
+					}
+					else if (dataType == "Config")
+					{
+						(*pluginsUpdatesJSON)[pluginName].append("\": {");
+						//loop through all config variables of new data
+						BOOST_FOREACH(ptree::value_type &cfg, plugin)
+						{
+							bool firstNvp = true;
+							bool addedConfigVariable = false;
+							//loop through all config variable name/value pairs of new data and check against old data if updated
+							BOOST_FOREACH(ptree::value_type &nvp, cfg.second)
+							{
+								bool update = false;
+								try
 								{
-									//this config variable has changed, add it
-									if (first)
-										first = false;
+									//get old value
+									message_path_type pluginKeyPath(pluginName, ATTRIBUTE_PATH_CHARACTER);
+									message_path_type configKeyPath(cfg.first, ATTRIBUTE_PATH_CHARACTER);
+									message_path_type keyPath(nvp.first, ATTRIBUTE_PATH_CHARACTER);
+									string value = oldPlugin.get_child(pluginKeyPath).get_child(configKeyPath).get<string>(keyPath);
+									if (nvp.second.data() != value)
+									{
+										//values dont match
+										update = true;
+									}
+								}
+								catch (exception & ex)
+								{
+									//old node doesnt exist
+									update = true;
+								}
+
+								if (update)
+								{
+									if (!addedConfigVariable)
+									{
+										//this config variable has changed, add it
+										if (first)
+											first = false;
+										else
+											(*pluginsUpdatesJSON)[pluginName].append(",");
+										(*pluginsUpdatesJSON)[pluginName].append("\"");
+										(*pluginsUpdatesJSON)[pluginName].append(cfg.first);
+										(*pluginsUpdatesJSON)[pluginName].append("\": {");
+										addedConfigVariable = true;
+									}
+									//add this name/value pair
+									if (firstNvp)
+										firstNvp = false;
 									else
 										(*pluginsUpdatesJSON)[pluginName].append(",");
 									(*pluginsUpdatesJSON)[pluginName].append("\"");
-									(*pluginsUpdatesJSON)[pluginName].append(cfg.first);
-									(*pluginsUpdatesJSON)[pluginName].append("\": {");
-									addedConfigVariable = true;
+									(*pluginsUpdatesJSON)[pluginName].append(nvp.first);
+									(*pluginsUpdatesJSON)[pluginName].append("\": \"");
+									string val = nvp.second.data();
+									boost::replace_all(val, "\"", "\\\"");
+									(*pluginsUpdatesJSON)[pluginName].append(val);
+									(*pluginsUpdatesJSON)[pluginName].append("\"");
 								}
-								//add this name/value pair
-								if (firstNvp)
-									firstNvp = false;
+							}
+							//close brackets if we added this config variable
+							if (addedConfigVariable)
+								(*pluginsUpdatesJSON)[pluginName].append("}");
+
+						}
+						//close plugin brackets
+						(*pluginsUpdatesJSON)[pluginName].append("}");
+					}
+					else if (dataType == "Messages")
+					{
+						(*pluginsUpdatesJSON)[pluginName].append("\": [");
+						//loop through all messages of new data
+						BOOST_FOREACH(ptree::value_type &msg, plugin)
+						{
+							bool update = false;
+							//get message json
+							stringstream msgSs;
+							msgSs.clear();
+							msgSs.str(string());
+							boost::property_tree::write_json(msgSs, msg.second, false);
+							string msgJSON = msgSs.str();
+
+							if (pJSON.find(msgJSON) == string::npos)
+							{
+								//values dont match or doesnt exist
+								update = true;
+							}
+
+							if (update)
+							{
+								//add full message json to update json
+								if (first)
+									first = false;
 								else
 									(*pluginsUpdatesJSON)[pluginName].append(",");
-								(*pluginsUpdatesJSON)[pluginName].append("\"");
-								(*pluginsUpdatesJSON)[pluginName].append(nvp.first);
-								(*pluginsUpdatesJSON)[pluginName].append("\": \"");
-								string val = nvp.second.data();
-								boost::replace_all(val, "\"", "\\\"");
-								(*pluginsUpdatesJSON)[pluginName].append(val);
-								(*pluginsUpdatesJSON)[pluginName].append("\"");
+								(*pluginsUpdatesJSON)[pluginName].append(msgJSON);
+							}
+
+						}
+						//close plugin brackets
+						(*pluginsUpdatesJSON)[pluginName].append("]");
+					}
+					else if (dataType == "SystemConfig")
+					{
+						//loop through all config variables of new data
+						BOOST_FOREACH(ptree::value_type &msg, plugin)
+						{
+							bool update = false;
+							//get config json
+							stringstream cfgSs;
+							cfgSs.clear();
+							cfgSs.str(string());
+							boost::property_tree::write_json(cfgSs, msg.second, false);
+							string cfgSON = cfgSs.str();
+
+							if (pJSON.find(cfgSON) == string::npos)
+							{
+								//values dont match or doesnt exist
+								update = true;
+							}
+
+							if (update)
+							{
+								//add full config json to update json
+								if (first)
+									first = false;
+								else
+									(*pluginsUpdatesJSON)[pluginName].append(",");
+								(*pluginsUpdatesJSON)[pluginName].append(cfgSON);
 							}
 						}
-						//close brackets if we added this config variable
-						if (addedConfigVariable)
-							(*pluginsUpdatesJSON)[pluginName].append("}");
-
-					}
-					//close plugin brackets
-					(*pluginsUpdatesJSON)[pluginName].append("}");
+					} 
 				}
-				else if (dataType == "Messages")
-				{
-					(*pluginsUpdatesJSON)[pluginName].append("\": [");
-					//loop through all messages of new data
-					BOOST_FOREACH(ptree::value_type &msg, plugin.second)
-					{
-						bool update = false;
-						//get message json
-						stringstream msgSs;
-						msgSs.clear();
-						msgSs.str(string());
-						boost::property_tree::write_json(msgSs, msg.second, false);
-						string msgJSON = msgSs.str();
-
-						if (pJSON.find(msgJSON) == string::npos)
-						{
-							//values dont match or doesnt exist
-							update = true;
-						}
-
-						if (update)
-						{
-							//add full message json to update json
-							if (first)
-								first = false;
-							else
-								(*pluginsUpdatesJSON)[pluginName].append(",");
-							(*pluginsUpdatesJSON)[pluginName].append(msgJSON);
-						}
-
-					}
-					//close plugin brackets
-					(*pluginsUpdatesJSON)[pluginName].append("]");
-				}
-				else if (dataType == "SystemConfig")
-				{
-					//loop through all config variables of new data
-					BOOST_FOREACH(ptree::value_type &msg, plugin.second)
-					{
-						bool update = false;
-						//get config json
-						stringstream cfgSs;
-						cfgSs.clear();
-						cfgSs.str(string());
-						boost::property_tree::write_json(cfgSs, msg.second, false);
-						string cfgSON = cfgSs.str();
-
-						if (pJSON.find(cfgSON) == string::npos)
-						{
-							//values dont match or doesnt exist
-							update = true;
-						}
-
-						if (update)
-						{
-							//add full config json to update json
-							if (first)
-								first = false;
-							else
-								(*pluginsUpdatesJSON)[pluginName].append(",");
-							(*pluginsUpdatesJSON)[pluginName].append(cfgSON);
-						}
-					}
-				}
-			}
-			//save json in map
-			(*pluginsJSON)[pluginName] = pJSON;
+				//save json in map
+				(*pluginsJSON)[pluginName] = pJSON;
+			}			
 		}
 		//clear removes
 		pluginsRemoveJSON->clear();
@@ -376,10 +375,11 @@ void CommandPlugin::BuildFullTelemetry(string *outputBuffer, const string & data
 	ostringstream oss;
 	bool processTelemetry = false;
 	string output;
+	tmx::message_container_type outputContainer;
 
 	if (dataType == "List" && _haveList)
 	{
-		output = _listJSON;
+		outputContainer = _listJSON;
 		processTelemetry = true;
 	}
 	else if (dataType == "Status" && _haveStatus)
@@ -422,14 +422,15 @@ void CommandPlugin::BuildFullTelemetry(string *outputBuffer, const string & data
 	if (processTelemetry)
 	{
 		//build  message
-
-		outputBuffer->append("\x02{\"header\":{\"type\":\"Telemetry\",\"subtype\":\"");
-
-		outputBuffer->append(dataType);
-		outputBuffer->append("\",\"encoding\":\"jsonstring\",\"timestamp\":\"");
-		oss << GetMsTimeSinceEpoch();
-		outputBuffer->append(oss.str());
-		outputBuffer->append("\",\"flags\":\"0\"},\"payload\":");
+		if (dataType != "List"){			
+			//TODO: Keep existing header build logic as it for the other dataTypes as we are in progress of updating headers for all dataTypes.
+			outputBuffer->append("\x02{\"header\":{\"type\":\"Telemetry\",\"subtype\":\"");
+			outputBuffer->append(dataType);
+			outputBuffer->append("\",\"encoding\":\"jsonstring\",\"timestamp\":\"");
+			oss << GetMsTimeSinceEpoch();
+			outputBuffer->append(oss.str());
+			outputBuffer->append("\",\"flags\":\"0\"},\"payload\":");
+		}
 
 		if (dataType == "Events" || dataType == "SystemConfig")
 		{
@@ -445,7 +446,15 @@ void CommandPlugin::BuildFullTelemetry(string *outputBuffer, const string & data
 		}
 		else
 		{
-			outputBuffer->append(output);
+			if (dataType == "List"){
+				TelemetryHeader header{"Telemetry" , dataType, "jsonstring", GetMsTimeSinceEpoch(),"0"};
+				auto headerJson = TelemetrySerializer::serializeTelemetryHeader(header);
+				outputBuffer->append(TelemetrySerializer::composeCompleteTelemetry(headerJson, outputContainer));
+				return; //TODO: Temporarily return to skip appending any more characters
+			}else{
+				//TODO: Keep existing header build logic as it for the other dataTypes as we are in progress of updating headers for all dataTypes.
+				outputBuffer->append(output);
+			}
 		}
 
 		outputBuffer->append("}\x03");
@@ -457,12 +466,13 @@ void CommandPlugin::BuildUpdateTelemetry(string *outputBuffer, const string & da
 	ostringstream oss;
 	bool processTelemetry = false;
 	static std::map<string, string> *updates;
+	static std::map<string, tmx::message_container_type> *updatesContainer;
 
 	if (dataType == "List" && _haveList)
 	{
 		if (_listPluginsUpdatesJSON.size() > 0)
 		{
-			updates = &_listPluginsUpdatesJSON;
+			updatesContainer = &_listPluginsUpdatesJSON;
 			processTelemetry = true;
 		}
 	}
@@ -518,13 +528,16 @@ void CommandPlugin::BuildUpdateTelemetry(string *outputBuffer, const string & da
 	if (processTelemetry)
 	{
 		//build message
+		//TODO: Temporarily ignore header for telemetry list
+		if(dataType!="List"){
+			outputBuffer->append("\x02{\"header\":{\"type\":\"Telemetry\",\"subtype\":\"");
 
-		outputBuffer->append("\x02{\"header\":{\"type\":\"Telemetry\",\"subtype\":\"");
-
-		outputBuffer->append(dataType);
-		outputBuffer->append("\",\"encoding\":\"jsonstring\",\"timestamp\":\"");
-		oss << GetMsTimeSinceEpoch();
-		outputBuffer->append(oss.str());
+			outputBuffer->append(dataType);
+			outputBuffer->append("\",\"encoding\":\"jsonstring\",\"timestamp\":\"");
+			oss << GetMsTimeSinceEpoch();
+			outputBuffer->append(oss.str());
+		}
+		
 		if (dataType == "Events")
 		{
 			//for events only have one chunk of json
@@ -541,21 +554,29 @@ void CommandPlugin::BuildUpdateTelemetry(string *outputBuffer, const string & da
 		}
 		else
 		{
-			outputBuffer->append("\",\"flags\":\"0\"},\"payload\":{");
+			if(dataType == "List"){
+				TelemetryHeader header{"Telemetry",dataType, "jsonstring", GetMsTimeSinceEpoch(),"0"};
+				auto headerContainer = TelemetrySerializer::serializeTelemetryHeader(header);
+				auto payloadContainer = TelemetrySerializer::composeUpdatedTelemetryPayload(*updatesContainer);
+				outputBuffer->append(TelemetrySerializer::composeCompleteTelemetry(headerContainer, payloadContainer));
+			}else{
+				outputBuffer->append("\",\"flags\":\"0\"},\"payload\":{");
 
-			//loop through updates
-			bool first = true;
-			for  (auto it = updates->begin();it != updates->end();it++)
-			{
-				if (first)
-					first = false;
-				else
-					outputBuffer->append(",");
-				//append plugin json
-				outputBuffer->append(it->second);
+				//loop through updates
+				bool first = true;
+				for  (auto it = updates->begin();it != updates->end();it++)
+				{
+					if (first)
+						first = false;
+					else
+						outputBuffer->append(",");
+					//append plugin json
+					outputBuffer->append(it->second);
+				}
+
+				outputBuffer->append("}}\x03");
 			}
-
-			outputBuffer->append("}}\x03");
+			
 		}
 
 
