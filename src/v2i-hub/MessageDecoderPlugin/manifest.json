@@ -1,0 +1,32 @@
+{
+	"name":"@TMX_PLUGIN_NAME@",
+	"description":"Message Decoder listens for TMX messages, decodes the messages, and optionally forwards the decoded contents to a UDP server.",
+	"version":"@PROJECT_VERSION@",
+	"exeLocation":"/bin/@PROJECT_NAME@",
+	"coreIpAddr":"127.0.0.1",
+	"corePort":24601,
+	"messageTypes":[
+	],
+	"configuration":[
+		{
+            "key":"LogLevel",
+            "default":"INFO",
+            "description":"The log level for this plugin."
+        },
+		{
+			"key":"Remote IP",
+			"default":"127.0.0.1",
+			"description":"IP address for the incoming message network connection."
+		},
+		{
+			"key":"Remote Port",
+			"default":"9001",
+			"description":"Port for the incoming message network connection."
+		},
+		{
+			"key":"RouteJ2735",
+			"default":"false",
+			"description":"Set the flag to route/broadcast a received J2735 message to TMX Core."
+		}
+	]
+}
