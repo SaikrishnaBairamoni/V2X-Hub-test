@@ -15,13 +15,15 @@
  * the License.
  */
 
-
 #include "MessageDecoderPlugin.h"
 
 namespace MessageDecoderPlugin
 {
 MessageDecoderPlugin::MessageDecoderPlugin(const std::string &name) : PluginClient(name)
 {
+    AddMessageFilter("J2735", "*", IvpMsgFlags_RouteDSRC);
+    // AddMessageFilter("Battelle-DSRC", "*", IvpMsgFlags_RouteDSRC);
+    SubscribeToMessages();
 }
 
 void MessageDecoderPlugin::UpdateConfigSettings()
@@ -43,11 +45,16 @@ void MessageDecoderPlugin::OnConfigChanged(const char *key, const char *value)
 void MessageDecoderPlugin::OnStateChange(IvpPluginState state)
 {
     PluginClient::OnStateChange(state);
-
     if (state == IvpPluginState_registered)
     {
         UpdateConfigSettings();
     }
+}
+
+void MessageDecoderPlugin::OnMessageReceived(IvpMessage *msg)
+{
+    PluginClient::OnMessageReceived(msg);
+    PLOG(logDEBUG) << "Received Message Type: " << msg->type << ", Subtype: " << msg->subtype << ", Payload: " << msg->payload;
 }
 
 // Override of main method of the plugin that should not return until the plugin exits.
@@ -55,13 +62,13 @@ void MessageDecoderPlugin::OnStateChange(IvpPluginState state)
 int MessageDecoderPlugin::Main()
 {
     PLOG(logINFO) << "Starting MessageDecoderPlugin...";
-
     while (_plugin->state != IvpPluginState_error)
     {
-        PLOG(logDEBUG4) <<"MessageDecoderPlugin: Sleeping 5 minutes";
-        this_thread::sleep_for(chrono::milliseconds(300000));
-    }
+        if (IsPluginState(IvpPluginState_registered))
+        {
 
+        }
+    }
     PLOG(logINFO) << "MessageDecoderPlugin terminating gracefully.";
     return EXIT_SUCCESS;
 }
@@ -72,4 +79,3 @@ int main(int argc, char *argv[])
 {
     return run_plugin<MessageDecoderPlugin::MessageDecoderPlugin>("MessageDecoderPlugin", argc, argv);
 }
-

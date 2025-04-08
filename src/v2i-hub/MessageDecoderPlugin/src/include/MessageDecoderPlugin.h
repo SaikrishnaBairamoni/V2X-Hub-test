@@ -27,16 +27,11 @@
 #include <atomic>
 #include <chrono>
 #include <thread>
-#include <tmx/json/cJSON.h>
-#include <tmx/messages/IvpJ2735.h>
-#include <tmx/messages/auto_message.hpp>
-#include <boost/filesystem.hpp>
 
 using namespace std;
 using namespace tmx;
 using namespace tmx::utils;
 using namespace tmx::messages;
-using namespace boost::filesystem;
 
 
 namespace MessageDecoderPlugin
@@ -73,6 +68,12 @@ protected:
      * @param state New plugin state
      */
     void OnStateChange(IvpPluginState state);
+
+    /** 
+     * @brief 
+     * @param msg 
+     */
+    void OnMessageReceived(IvpMessage *msg);
  
 private:
     std::mutex _cfgLock;
