@@ -16,8 +16,6 @@
 #pragma once
 
 #include "PluginClient.h"
-#include "PluginDataMonitor.h"
-
 #include <iostream>
 #include <cstring>
 #include <string>
@@ -77,8 +75,8 @@ protected:
  
 private:
     std::mutex _cfgLock;
-    const string remoteIP_;
-    const int remotePort_;
+    string remoteIP_;
+    int remotePort_;
  
 };
 } /* namespace MessageDecoderPlugin */

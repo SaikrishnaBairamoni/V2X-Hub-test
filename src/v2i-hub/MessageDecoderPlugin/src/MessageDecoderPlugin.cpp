@@ -15,7 +15,7 @@
  * the License.
  */
 
-#include "MessageDecoderPlugin.h"
+#include "include/MessageDecoderPlugin.h"
 
 namespace MessageDecoderPlugin
 {
