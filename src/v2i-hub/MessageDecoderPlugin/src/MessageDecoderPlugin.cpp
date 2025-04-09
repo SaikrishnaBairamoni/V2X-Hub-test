@@ -54,7 +54,7 @@ void MessageDecoderPlugin::OnStateChange(IvpPluginState state)
 void MessageDecoderPlugin::OnMessageReceived(IvpMessage *msg)
 {
     PluginClient::OnMessageReceived(msg);
-    PLOG(logDEBUG) << "Received Message Type: " << msg->type << ", Subtype: " << msg->subtype << ", Payload: " << msg->payload;
+    PLOG(logDEBUG) << "Received Message Type: " << msg->type << ", Subtype: " << msg->subtype << ", Payload: " << msg->payload->valuestring;
 }
 
 // Override of main method of the plugin that should not return until the plugin exits.
