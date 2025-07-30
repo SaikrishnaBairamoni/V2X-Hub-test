@@ -3,6 +3,7 @@
 |----------------------|---------------------|---------------------|
  [![Build Workflows](https://github.com/usdot-fhwa-OPS/V2X-Hub/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/usdot-fhwa-OPS/V2X-Hub/actions/workflows/build.yml)|[![CircleCI](https://dl.circleci.com/status-badge/img/gh/usdot-fhwa-OPS/V2X-Hub/tree/develop.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/usdot-fhwa-OPS/V2X-Hub/tree/develop)| [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=usdot-fhwa-ops_V2X-Hub&metric=alert_status)](https://sonarcloud.io/dashboard?id=usdot-fhwa-ops_V2X-Hub) |
  ## Release CI/CD Processes
+ trigger release/dummy build
 | V2X-Hub Docker Image Builds (x86 or AMD) | V2X-Hub Docker Image Builds (ARM) | 
 |----------------------|---------------------|
  [![Build Workflows](https://github.com/usdot-fhwa-OPS/V2X-Hub/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/usdot-fhwa-OPS/V2X-Hub/actions/workflows/build.yml)|[![CircleCI](https://dl.circleci.com/status-badge/img/gh/usdot-fhwa-OPS/V2X-Hub/tree/master.svg?style=svg)](https://dl.circleci.com/status-badge/redirect/gh/usdot-fhwa-OPS/V2X-Hub/tree/master)|
@@ -66,3 +67,6 @@ Please read our [V2X-Hub Code of Conduct](Code_of_Conduct.md) which outlines our
 
 ## Attribution
 The development team would like to acknowledge the people who have made direct contributions to the design and code in this repository. [V2X-Hub Attribution](ATTRIBUTION.txt) 
+
+## Support
+For technical support, please contact the help desk at CAVSupportServices@dot.gov.

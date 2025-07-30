@@ -27,7 +27,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: usdotfhwaops/port-drayage-webservice
+          images: usdotfhwaops/port-drayage-webservice-test
           tags: |
             type=schedule
             type=ref,event=branch
