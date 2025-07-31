@@ -31,7 +31,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: usdotfhwaops/v2xhub-test
+          images: usdotfhwaops/v2xhub
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -67,7 +69,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: usdotfhwaops/v2xhub-test
+          images: usdotfhwaops/v2xhub
+          flavor: |
+            latest=false
           tags: |
             type=ref,event=branch
             type=ref,event=tag
@@ -97,7 +101,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: usdotfhwaops/v2xhub-test
+          images: usdotfhwaops/v2xhub
           flavor: |
             latest=false
           tags: |
